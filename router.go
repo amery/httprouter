@@ -77,13 +77,9 @@
 package mux
 
 import (
+	"context"
 	"net/http"
 )
-
-// Handle is a function that can be registered to a route to handle HTTP
-// requests. Like http.HandlerFunc, but has a third parameter for the values of
-// wildcards (variables).
-type Handle func(http.ResponseWriter, *http.Request, Params)
 
 // Param is a single URL parameter, consisting of a key and a value.
 type Param struct {
@@ -149,6 +145,7 @@ var _ http.Handler = New()
 // Path auto-correction, including trailing slashes, is enabled by default.
 func New() *Router {
 	return &Router{
+		root:                  new(node),
 		RedirectTrailingSlash: true,
 		RedirectFixedPath:     true,
 	}
@@ -162,11 +159,12 @@ func New() *Router {
 // This function is intended for bulk loading and to allow the usage of less
 // frequently used, non-standardized or custom methods (e.g. for internal
 // communication with a proxy).
-func (r *Router) Handle(path string, handle Handle) {
+func (r *Router) Handle(path string, handle http.Handler) {
 	if path[0] != '/' {
 		panic("path must begin with '/' in path '" + path + "'")
 	}
 
+	// just in case it wasn't created using New()
 	if r.root == nil {
 		r.root = new(node)
 	}
@@ -176,8 +174,8 @@ func (r *Router) Handle(path string, handle Handle) {
 
 // HandlerFunc is an adapter which allows the usage of an http.HandlerFunc as a
 // request handle.
-func (r *Router) HandlerFunc(path string, handler http.HandlerFunc) {
-	r.Handler(path, handler)
+func (r *Router) HandleFunc(path string, handler http.HandlerFunc) {
+	r.Handle(path, handler)
 }
 
 // ServeFiles serves files from the given file system root.
@@ -197,7 +195,8 @@ func (r *Router) ServeFiles(path string, root http.FileSystem) {
 
 	fileServer := http.FileServer(root)
 
-	r.GET(path, func(w http.ResponseWriter, req *http.Request, ps Params) {
+	r.GET(path, func(w http.ResponseWriter, req *http.Request) {
+		ps := ParamsFromContext(req.Context())
 		req.URL.Path = ps.ByName("filepath")
 		fileServer.ServeHTTP(w, req)
 	})
@@ -214,7 +213,7 @@ func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
 // If the path was found, it returns the handle function and the path parameter
 // values. Otherwise the third return value indicates whether a redirection to
 // the same path with an extra / without the trailing slash should be performed.
-func (r *Router) Lookup(method, path string) (Handle, Params, bool) {
+func (r *Router) Lookup(method, path string) (http.Handler, Params, bool) {
 	if root := r.root; root != nil {
 		return root.getValue(path)
 	}
@@ -231,7 +230,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if root := r.root; root != nil {
 		if handle, ps, tsr := root.getValue(path); handle != nil {
-			handle(w, req, ps)
+			ctx := req.Context()
+			ctx = context.WithValue(ctx, ParamsKey, ps)
+			handle.ServeHTTP(w, req.WithContext(ctx))
 			return
 		} else if req.Method != "CONNECT" && path != "/" {
 			code := 301 // Permanent redirect, request with GET method

@@ -49,8 +49,9 @@ func TestRouter(t *testing.T) {
 	router := New()
 
 	routed := false
-	router.Handle("/user/:name", func(w http.ResponseWriter, r *http.Request, ps Params) {
+	router.HandleFunc("/user/:name", func(w http.ResponseWriter, r *http.Request) {
 		routed = true
+		ps := ParamsFromContext(r.Context())
 		want := Params{Param{"name", "gopher"}}
 		if !reflect.DeepEqual(ps, want) {
 			t.Fatalf("wrong wildcard values: want %v, got %v", want, ps)
@@ -91,13 +92,13 @@ func TestRouterChaining(t *testing.T) {
 	router1.NotFound = router2
 
 	fooHit := false
-	router1.Handle("/foo", func(w http.ResponseWriter, req *http.Request, _ Params) {
+	router1.HandleFunc("/foo", func(w http.ResponseWriter, req *http.Request) {
 		fooHit = true
 		w.WriteHeader(http.StatusOK)
 	})
 
 	barHit := false
-	router2.Handle("/bar", func(w http.ResponseWriter, req *http.Request, _ Params) {
+	router2.HandleFunc("/bar", func(w http.ResponseWriter, req *http.Request) {
 		barHit = true
 		w.WriteHeader(http.StatusOK)
 	})
@@ -128,7 +129,7 @@ func TestRouterChaining(t *testing.T) {
 }
 
 func TestRouterNotFound(t *testing.T) {
-	handlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}
+	handlerFunc := func(_ http.ResponseWriter, _ *http.Request) {}
 
 	router := New()
 	router.GET("/path", handlerFunc)
@@ -173,7 +174,7 @@ func TestRouterNotFound(t *testing.T) {
 	}
 
 	// Test other method than GET (want 307 instead of 301)
-	router.Handle("/path2", handlerFunc)
+	router.HandleFunc("/path2", handlerFunc)
 	r, _ = http.NewRequest("PATCH", "/path2/", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -200,7 +201,7 @@ func TestRouterPanicHandler(t *testing.T) {
 		panicHandled = true
 	}
 
-	router.Handle("/user/:name", func(_ http.ResponseWriter, _ *http.Request, _ Params) {
+	router.HandleFunc("/user/:name", func(_ http.ResponseWriter, _ *http.Request) {
 		panic("oops!")
 	})
 
@@ -222,7 +223,7 @@ func TestRouterPanicHandler(t *testing.T) {
 
 func TestRouterLookup(t *testing.T) {
 	routed := false
-	wantHandle := func(_ http.ResponseWriter, _ *http.Request, _ Params) {
+	wantHandle := func(_ http.ResponseWriter, _ *http.Request) {
 		routed = true
 	}
 	wantParams := Params{Param{"name", "gopher"}}
@@ -245,7 +246,7 @@ func TestRouterLookup(t *testing.T) {
 	if handle == nil {
 		t.Fatal("Got no handle!")
 	} else {
-		handle(nil, nil, nil)
+		handle.ServeHTTP(nil, nil)
 		if !routed {
 			t.Fatal("Routing failed!")
 		}

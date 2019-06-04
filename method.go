@@ -17,7 +17,7 @@ type MethodNotAllowed interface {
 // calling another handler only if the Method is right
 type MethodHandler struct {
 	methods []string
-	handle  Handle
+	handler http.Handler
 }
 
 func (h MethodHandler) Options() []string {
@@ -28,15 +28,15 @@ func (h MethodHandler) Error() string {
 	return fmt.Sprintf("Allow: %s", strings.Join(h.methods, ", "))
 }
 
-func (h MethodHandler) Handle(w http.ResponseWriter, r *http.Request, ps Params) {
+func (h MethodHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r == nil {
-		h.handle(w, r, ps)
+		h.handler.ServeHTTP(w, r)
 		return
 	}
 
 	for _, method := range h.methods {
 		if method == r.Method {
-			h.handle(w, r, ps)
+			h.handler.ServeHTTP(w, r)
 			return
 		}
 	}
@@ -45,10 +45,18 @@ func (h MethodHandler) Handle(w http.ResponseWriter, r *http.Request, ps Params)
 }
 
 // Adds path only supports GET to Router
-func (r *Router) GET(path string, handle Handle) {
+func (r *Router) GET(path string, handler http.HandlerFunc) {
 	h := MethodHandler{
 		methods: []string{"GET", "HEAD"},
-		handle:  handle,
+		handler: handler,
 	}
-	r.Handle(path, h.Handle)
+	r.Handle(path, h)
+}
+
+// MethodHandlerFunc makes a Handler only accept a given set of Methods
+func MethodHandlerFunc(methods []string, handler http.HandlerFunc) http.Handler {
+	return MethodHandler{
+		methods: methods,
+		handler: handler,
+	}
 }
