@@ -230,7 +230,7 @@ func TestRouterLookup(t *testing.T) {
 	router := New()
 
 	// try empty router first
-	handle, _, tsr := router.Lookup("GET", "/nope")
+	handle, _, tsr := router.Lookup("/nope")
 	if handle != nil {
 		t.Fatalf("Got handle for unregistered pattern: %v", handle)
 	}
@@ -241,7 +241,7 @@ func TestRouterLookup(t *testing.T) {
 	// insert route and try again
 	router.HandleFunc("/user/:name", wantHandle)
 
-	handle, params, tsr := router.Lookup("GET", "/user/gopher")
+	handle, params, tsr := router.Lookup("/user/gopher")
 	if handle == nil {
 		t.Fatal("Got no handle!")
 	} else {
@@ -255,7 +255,7 @@ func TestRouterLookup(t *testing.T) {
 		t.Fatalf("Wrong parameter values: want %v, got %v", wantParams, params)
 	}
 
-	handle, _, tsr = router.Lookup("GET", "/user/gopher/")
+	handle, _, tsr = router.Lookup("/user/gopher/")
 	if handle != nil {
 		t.Fatalf("Got handle for unregistered pattern: %v", handle)
 	}
@@ -263,7 +263,7 @@ func TestRouterLookup(t *testing.T) {
 		t.Error("Got no TSR recommendation!")
 	}
 
-	handle, _, tsr = router.Lookup("GET", "/nope")
+	handle, _, tsr = router.Lookup("/nope")
 	if handle != nil {
 		t.Fatalf("Got handle for unregistered pattern: %v", handle)
 	}
