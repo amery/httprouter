@@ -78,7 +78,7 @@ func (h handlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func TestRouterRoot(t *testing.T) {
 	router := New()
 	recv := catchPanic(func() {
-		router.GET("noSlashRoot", nil)
+		router.Handle("noSlashRoot", nil)
 	})
 	if recv == nil {
 		t.Fatal("registering path not beginning with '/' did not panic")
@@ -131,9 +131,9 @@ func TestRouterNotFound(t *testing.T) {
 	handlerFunc := func(_ http.ResponseWriter, _ *http.Request) {}
 
 	router := New()
-	router.GET("/path", handlerFunc)
-	router.GET("/dir/", handlerFunc)
-	router.GET("/", handlerFunc)
+	router.HandleFunc("/path", handlerFunc)
+	router.HandleFunc("/dir/", handlerFunc)
+	router.HandleFunc("/", handlerFunc)
 
 	testRoutes := []struct {
 		route    string
@@ -183,7 +183,7 @@ func TestRouterNotFound(t *testing.T) {
 
 	// Test special case where no node for the prefix "/" exists
 	router = New()
-	router.GET("/a", handlerFunc)
+	router.HandleFunc("/a", handlerFunc)
 	r, _ = http.NewRequest("GET", "/", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -239,7 +239,7 @@ func TestRouterLookup(t *testing.T) {
 	}
 
 	// insert route and try again
-	router.GET("/user/:name", wantHandle)
+	router.HandleFunc("/user/:name", wantHandle)
 
 	handle, params, tsr := router.Lookup("GET", "/user/gopher")
 	if handle == nil {
